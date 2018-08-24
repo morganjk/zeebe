@@ -659,6 +659,39 @@ public class BrokerReprocessingTest {
         .containsOnly(entry("orderId", "order-123"), entry("foo", "bar"));
   }
 
+  @Test
+  public void shouldCorrelateMessageStartEventAfterRestartIfDeployedBefore() throws Exception {
+    // given
+    final BpmnModelInstance workflow =
+        Bpmn.createExecutableProcess("process")
+            .startEvent()
+            .message(m -> m.name("order canceled"))
+            .endEvent()
+            .done();
+
+    clientRule
+        .getWorkflowClient()
+        .newDeployCommand()
+        .addWorkflowModel(workflow, "message.bpmn")
+        .send()
+        .join();
+
+    brokerRule.restartBroker();
+
+    // when
+    publishMessage("order canceled", "order-123", singletonMap("foo", "bar"));
+
+    waitUntil(
+        () -> eventRecorder.hasElementInState("process", WorkflowInstanceState.ELEMENT_COMPLETED));
+
+    // then
+    final WorkflowInstanceEvent event =
+        eventRecorder.getElementInState("process", WorkflowInstanceState.ELEMENT_COMPLETED);
+
+    assertThat(event.getBpmnProcessId()).isEqualTo("process");
+    assertThat(event.getPayloadAsMap()).containsOnly(entry("foo", "bar"));
+  }
+
   private WorkflowInstanceEvent startWorkflowInstance(String bpmnProcessId) {
     return clientRule
         .getWorkflowClient()

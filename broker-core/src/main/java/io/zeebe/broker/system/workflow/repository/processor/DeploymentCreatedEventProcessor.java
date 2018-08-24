@@ -18,19 +18,34 @@
 package io.zeebe.broker.system.workflow.repository.processor;
 
 import io.zeebe.broker.Loggers;
+import io.zeebe.broker.logstreams.processor.TypedBatchWriter;
 import io.zeebe.broker.logstreams.processor.TypedRecord;
 import io.zeebe.broker.logstreams.processor.TypedRecordProcessor;
 import io.zeebe.broker.logstreams.processor.TypedResponseWriter;
 import io.zeebe.broker.logstreams.processor.TypedStreamWriter;
+import io.zeebe.broker.subscription.message.data.MessageSubscriptionRecord;
 import io.zeebe.broker.system.workflow.repository.data.DeployedWorkflow;
 import io.zeebe.broker.system.workflow.repository.data.DeploymentRecord;
 import io.zeebe.broker.system.workflow.repository.processor.state.WorkflowRepositoryIndex;
 import io.zeebe.broker.system.workflow.repository.processor.state.WorkflowRepositoryIndex.WorkflowMetadata;
+import io.zeebe.broker.workflow.model.ExecutableStartEvent;
+import io.zeebe.broker.workflow.model.ExecutableWorkflow;
+import io.zeebe.broker.workflow.model.transformation.BpmnTransformer;
+import io.zeebe.model.bpmn.Bpmn;
+import io.zeebe.model.bpmn.BpmnModelInstance;
 import io.zeebe.msgpack.value.ValueArray;
+import io.zeebe.protocol.intent.MessageSubscriptionIntent;
 import io.zeebe.util.buffer.BufferUtil;
+import java.util.List;
+import org.agrona.DirectBuffer;
+import org.agrona.io.DirectBufferInputStream;
 
 public class DeploymentCreatedEventProcessor implements TypedRecordProcessor<DeploymentRecord> {
   private WorkflowRepositoryIndex repositoryIndex;
+
+  private final BpmnTransformer transformer = new BpmnTransformer();
+
+  private TypedBatchWriter batchWriter;
 
   public DeploymentCreatedEventProcessor(WorkflowRepositoryIndex repositoryIndex) {
     this.repositoryIndex = repositoryIndex;
@@ -42,6 +57,52 @@ public class DeploymentCreatedEventProcessor implements TypedRecordProcessor<Dep
       TypedResponseWriter responseWriter,
       TypedStreamWriter streamWriter) {
     addWorkflowsToIndex(event);
+
+    batchWriter = null;
+
+    // TODO create a message subscription per message start event
+    // TODO remove message subscriptions of previous workflow
+    event
+        .getValue()
+        .resources()
+        .forEach(
+            resource -> {
+              final DirectBufferInputStream inputStream =
+                  new DirectBufferInputStream(resource.getResource());
+              final BpmnModelInstance modelInstance = Bpmn.readModelFromStream(inputStream);
+
+              final List<ExecutableWorkflow> workflows =
+                  transformer.transformDefinitions(modelInstance);
+              workflows.forEach(
+                  workflow -> {
+                    // TODO add support for multiple start events
+                    final ExecutableStartEvent startEvent = workflow.getStartEvent();
+                    if (startEvent.isMessageStartEvent()) {
+                      final DirectBuffer messageName = startEvent.getMessageName();
+
+                      // TODO get workflow key by resource
+                      long workflowKey = -1L;
+                      for (final DeployedWorkflow deployedWorkflow :
+                          event.getValue().deployedWorkflows()) {
+                        if (BufferUtil.contentsEqual(
+                            deployedWorkflow.getResourceName(), resource.getResourceName())) {
+                          workflowKey = deployedWorkflow.getKey();
+                        }
+                      }
+
+                      final MessageSubscriptionRecord subscription =
+                          new MessageSubscriptionRecord();
+                      subscription.setMessageName(messageName).setWorkflowKey(workflowKey);
+
+                      if (batchWriter == null) {
+                        batchWriter = streamWriter.newBatch();
+                      }
+
+                      batchWriter.addNewCommand(
+                          MessageSubscriptionIntent.OPEN_FOR_START_EVENT, subscription);
+                    }
+                  });
+            });
   }
 
   private void addWorkflowsToIndex(TypedRecord<DeploymentRecord> event) {
