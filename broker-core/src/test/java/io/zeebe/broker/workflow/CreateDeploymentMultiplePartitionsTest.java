@@ -22,9 +22,9 @@ import static io.zeebe.test.util.TestUtil.doRepeatedly;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.data.MapEntry.entry;
 
-import io.zeebe.broker.system.workflow.repository.data.ResourceType;
 import io.zeebe.broker.test.EmbeddedBrokerRule;
 import io.zeebe.broker.workflow.data.WorkflowInstanceRecord;
+import io.zeebe.broker.workflow.deployment.data.ResourceType;
 import io.zeebe.model.bpmn.Bpmn;
 import io.zeebe.model.bpmn.BpmnModelInstance;
 import io.zeebe.protocol.clientapi.RecordType;

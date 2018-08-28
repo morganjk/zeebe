@@ -19,7 +19,7 @@ package io.zeebe.broker.system.workflow.repository.api.management;
 
 import io.zeebe.broker.Loggers;
 import io.zeebe.broker.clustering.base.partitions.Partition;
-import io.zeebe.broker.system.workflow.repository.data.DeploymentRecord;
+import io.zeebe.broker.workflow.deployment.data.DeploymentRecord;
 import io.zeebe.logstreams.log.LogStreamRecordWriter;
 import io.zeebe.logstreams.log.LogStreamWriterImpl;
 import io.zeebe.msgpack.UnpackedObject;

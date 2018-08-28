@@ -15,30 +15,29 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-package io.zeebe.broker.workflow.map;
+package io.zeebe.broker.workflow.deployment.data;
 
-import io.zeebe.broker.workflow.model.ExecutableWorkflow;
+import io.zeebe.msgpack.UnpackedObject;
+import io.zeebe.msgpack.property.ArrayProperty;
+import io.zeebe.msgpack.value.ValueArray;
 
-public class DeployedWorkflow {
-  private final ExecutableWorkflow workflow;
-  private final long key;
-  private final int version;
+public class DeploymentRecord extends UnpackedObject {
 
-  public DeployedWorkflow(ExecutableWorkflow workflow, long key, int version) {
-    this.workflow = workflow;
-    this.key = key;
-    this.version = version;
+  private final ArrayProperty<DeploymentResource> resourcesProp =
+      new ArrayProperty<>("resources", new DeploymentResource());
+
+  private final ArrayProperty<Workflow> workflowsProp =
+      new ArrayProperty<>("workflows", new Workflow());
+
+  public DeploymentRecord() {
+    this.declareProperty(resourcesProp).declareProperty(workflowsProp);
   }
 
-  public ExecutableWorkflow getWorkflow() {
-    return workflow;
+  public ValueArray<Workflow> workflows() {
+    return workflowsProp;
   }
 
-  public int getVersion() {
-    return version;
-  }
-
-  public long getKey() {
-    return key;
+  public ValueArray<DeploymentResource> resources() {
+    return resourcesProp;
   }
 }

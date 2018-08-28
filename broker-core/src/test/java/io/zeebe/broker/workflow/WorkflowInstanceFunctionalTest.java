@@ -27,8 +27,8 @@ import static io.zeebe.test.util.MsgPackUtil.asMsgPack;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.zeebe.broker.system.workflow.repository.data.ResourceType;
 import io.zeebe.broker.test.EmbeddedBrokerRule;
+import io.zeebe.broker.workflow.deployment.data.ResourceType;
 import io.zeebe.model.bpmn.Bpmn;
 import io.zeebe.model.bpmn.BpmnModelInstance;
 import io.zeebe.protocol.clientapi.ExecuteCommandResponseDecoder;

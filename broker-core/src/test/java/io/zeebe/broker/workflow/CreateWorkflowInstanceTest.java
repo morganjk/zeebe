@@ -33,8 +33,8 @@ import static io.zeebe.test.broker.protocol.clientapi.TestTopicClient.PROP_WORKF
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowable;
 
-import io.zeebe.broker.system.workflow.repository.data.ResourceType;
 import io.zeebe.broker.test.EmbeddedBrokerRule;
+import io.zeebe.broker.workflow.deployment.data.ResourceType;
 import io.zeebe.broker.workflow.map.WorkflowCache;
 import io.zeebe.model.bpmn.Bpmn;
 import io.zeebe.model.bpmn.BpmnModelInstance;

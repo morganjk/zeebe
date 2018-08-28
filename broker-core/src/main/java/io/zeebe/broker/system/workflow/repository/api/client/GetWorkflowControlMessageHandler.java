@@ -17,9 +17,9 @@
  */
 package io.zeebe.broker.system.workflow.repository.api.client;
 
-import io.zeebe.broker.system.workflow.repository.processor.state.WorkflowRepositoryIndex.WorkflowMetadata;
-import io.zeebe.broker.system.workflow.repository.service.WorkflowRepositoryService;
 import io.zeebe.broker.transport.controlmessage.AbstractControlMessageHandler;
+import io.zeebe.broker.workflow.deployment.distribute.processor.state.WorkflowRepositoryIndex.WorkflowMetadata;
+import io.zeebe.broker.workflow.deployment.distribute.service.WorkflowRepositoryService;
 import io.zeebe.protocol.Protocol;
 import io.zeebe.protocol.clientapi.ControlMessageType;
 import io.zeebe.protocol.clientapi.ErrorCode;

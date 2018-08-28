@@ -21,8 +21,8 @@ import io.zeebe.broker.system.management.LeaderManagementRequestHandler;
 import io.zeebe.broker.system.management.topics.FetchCreatedTopicsRequestHandlerService;
 import io.zeebe.broker.system.metrics.MetricsFileWriter;
 import io.zeebe.broker.system.workflow.repository.api.management.PushDeploymentRequestHandler;
-import io.zeebe.broker.system.workflow.repository.service.DeploymentManager;
-import io.zeebe.broker.system.workflow.repository.service.WorkflowRepositoryService;
+import io.zeebe.broker.workflow.deployment.distribute.service.DeploymentManager;
+import io.zeebe.broker.workflow.deployment.distribute.service.WorkflowRepositoryService;
 import io.zeebe.servicecontainer.ServiceName;
 
 public class SystemServiceNames {

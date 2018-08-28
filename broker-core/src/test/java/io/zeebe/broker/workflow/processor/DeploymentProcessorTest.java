@@ -23,13 +23,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import io.zeebe.broker.clustering.base.topology.TopologyManager;
 import io.zeebe.broker.logstreams.processor.TypedRecord;
-import io.zeebe.broker.system.workflow.repository.data.DeploymentRecord;
-import io.zeebe.broker.system.workflow.repository.data.ResourceType;
-import io.zeebe.broker.system.workflow.repository.processor.DeploymentStreamProcessor;
-import io.zeebe.broker.system.workflow.repository.processor.DeploymentTransformer;
-import io.zeebe.broker.system.workflow.repository.processor.state.WorkflowRepositoryIndex;
 import io.zeebe.broker.topic.StreamProcessorControl;
 import io.zeebe.broker.util.StreamProcessorRule;
+import io.zeebe.broker.workflow.deployment.data.DeploymentRecord;
+import io.zeebe.broker.workflow.deployment.data.ResourceType;
+import io.zeebe.broker.workflow.deployment.distribute.processor.DeploymentStreamProcessor;
+import io.zeebe.broker.workflow.deployment.distribute.processor.state.WorkflowRepositoryIndex;
+import io.zeebe.broker.workflow.deployment.transform.DeploymentTransformer;
 import io.zeebe.model.bpmn.Bpmn;
 import io.zeebe.model.bpmn.BpmnModelInstance;
 import io.zeebe.protocol.Protocol;
@@ -59,8 +59,7 @@ public class DeploymentProcessorTest {
   public void setUp() {
     MockitoAnnotations.initMocks(this);
     workflowRepositoryIndex = new WorkflowRepositoryIndex();
-    deploymentStreamProcessor =
-        new DeploymentStreamProcessor(workflowRepositoryIndex, topologyManager, managementApi);
+    deploymentStreamProcessor = new DeploymentStreamProcessor(topologyManager, managementApi);
 
     streamProcessor =
         rule.initStreamProcessor(env -> deploymentStreamProcessor.createStreamProcessor(env));

@@ -36,8 +36,8 @@ import static io.zeebe.broker.transport.TransportServiceNames.serverTransport;
 import io.zeebe.broker.system.management.LeaderManagementRequestHandler;
 import io.zeebe.broker.system.management.topics.FetchCreatedTopicsRequestHandlerService;
 import io.zeebe.broker.system.metrics.MetricsFileWriterService;
-import io.zeebe.broker.system.workflow.repository.service.DeploymentManager;
 import io.zeebe.broker.transport.TransportServiceNames;
+import io.zeebe.broker.workflow.deployment.distribute.service.DeploymentManager;
 import io.zeebe.servicecontainer.ServiceContainer;
 
 public class SystemComponent implements Component {

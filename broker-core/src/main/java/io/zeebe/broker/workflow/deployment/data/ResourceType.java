@@ -15,30 +15,10 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-package io.zeebe.broker.workflow.map;
+package io.zeebe.broker.workflow.deployment.data;
 
-import io.zeebe.broker.workflow.model.ExecutableWorkflow;
+public enum ResourceType {
+  BPMN_XML,
 
-public class DeployedWorkflow {
-  private final ExecutableWorkflow workflow;
-  private final long key;
-  private final int version;
-
-  public DeployedWorkflow(ExecutableWorkflow workflow, long key, int version) {
-    this.workflow = workflow;
-    this.key = key;
-    this.version = version;
-  }
-
-  public ExecutableWorkflow getWorkflow() {
-    return workflow;
-  }
-
-  public int getVersion() {
-    return version;
-  }
-
-  public long getKey() {
-    return key;
-  }
+  YAML_WORKFLOW;
 }

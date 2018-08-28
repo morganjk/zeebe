@@ -19,7 +19,6 @@ package io.zeebe.broker.system.management;
 
 import io.zeebe.broker.clustering.base.partitions.Partition;
 import io.zeebe.broker.system.management.topics.FetchCreatedTopicsRequestHandler;
-import io.zeebe.broker.system.workflow.repository.api.management.FetchWorkflowRequestHandler;
 import io.zeebe.broker.system.workflow.repository.api.management.NotLeaderResponse;
 import io.zeebe.broker.system.workflow.repository.api.management.PushDeploymentRequestHandler;
 import io.zeebe.clustering.management.FetchCreatedTopicsRequestDecoder;
@@ -50,8 +49,6 @@ public class LeaderManagementRequestHandler extends Actor
 
   private final Injector<BufferingServerTransport> managementApiServerTransportInjector =
       new Injector<>();
-  private final AtomicReference<FetchWorkflowRequestHandler> fetchWorkflowHandlerRef =
-      new AtomicReference<>();
   private final AtomicReference<FetchCreatedTopicsRequestHandler> fetchCreatedTopicsHandlerRef =
       new AtomicReference<>();
   private PushDeploymentRequestHandler pushDeploymentRequestHandler;
@@ -136,10 +133,6 @@ public class LeaderManagementRequestHandler extends Actor
       final int templateId = messageHeaderDecoder.templateId();
 
       switch (templateId) {
-        case FetchWorkflowRequestDecoder.TEMPLATE_ID:
-          {
-            return onFetchWorkflow(buffer, offset, length, output, remoteAddress, requestId);
-          }
         case FetchCreatedTopicsRequestDecoder.TEMPLATE_ID:
           {
             return onFetchCreatedTopics(buffer, offset, length, output, remoteAddress, requestId);
@@ -178,24 +171,6 @@ public class LeaderManagementRequestHandler extends Actor
     return true;
   }
 
-  private boolean onFetchWorkflow(
-      DirectBuffer buffer,
-      int offset,
-      int length,
-      ServerOutput output,
-      RemoteAddress remoteAddress,
-      long requestId) {
-    final FetchWorkflowRequestHandler handler = fetchWorkflowHandlerRef.get();
-
-    if (handler != null) {
-      handler.onFetchWorkflow(buffer, offset, length, output, remoteAddress, requestId, actor);
-
-      return true;
-    } else {
-      return sendNotLeaderResponse(output, remoteAddress, requestId);
-    }
-  }
-
   private boolean onFetchCreatedTopics(
       DirectBuffer buffer,
       int offset,
@@ -232,11 +207,6 @@ public class LeaderManagementRequestHandler extends Actor
 
   public Injector<BufferingServerTransport> getManagementApiServerTransportInjector() {
     return managementApiServerTransportInjector;
-  }
-
-  public void setFetchWorkflowRequestHandler(
-      FetchWorkflowRequestHandler fetchWorkflowRequestHandler) {
-    fetchWorkflowHandlerRef.set(fetchWorkflowRequestHandler);
   }
 
   public void setFetchCreatedTopicsRequestHandler(

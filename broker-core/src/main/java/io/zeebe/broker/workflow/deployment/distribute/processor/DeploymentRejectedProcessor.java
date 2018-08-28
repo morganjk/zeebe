@@ -15,30 +15,21 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-package io.zeebe.broker.workflow.map;
+package io.zeebe.broker.workflow.deployment.distribute.processor;
 
-import io.zeebe.broker.workflow.model.ExecutableWorkflow;
+import io.zeebe.broker.logstreams.processor.TypedRecord;
+import io.zeebe.broker.logstreams.processor.TypedRecordProcessor;
+import io.zeebe.broker.logstreams.processor.TypedResponseWriter;
+import io.zeebe.broker.logstreams.processor.TypedStreamWriter;
+import io.zeebe.broker.workflow.deployment.data.DeploymentRecord;
 
-public class DeployedWorkflow {
-  private final ExecutableWorkflow workflow;
-  private final long key;
-  private final int version;
+public class DeploymentRejectedProcessor implements TypedRecordProcessor<DeploymentRecord> {
 
-  public DeployedWorkflow(ExecutableWorkflow workflow, long key, int version) {
-    this.workflow = workflow;
-    this.key = key;
-    this.version = version;
-  }
-
-  public ExecutableWorkflow getWorkflow() {
-    return workflow;
-  }
-
-  public int getVersion() {
-    return version;
-  }
-
-  public long getKey() {
-    return key;
+  @Override
+  public void processRecord(
+      TypedRecord<DeploymentRecord> record,
+      TypedResponseWriter responseWriter,
+      TypedStreamWriter streamWriter) {
+    responseWriter.writeRejection(record);
   }
 }

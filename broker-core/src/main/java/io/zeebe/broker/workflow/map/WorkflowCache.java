@@ -24,21 +24,17 @@ import io.zeebe.broker.clustering.base.topology.NodeInfo;
 import io.zeebe.broker.clustering.base.topology.PartitionInfo;
 import io.zeebe.broker.clustering.base.topology.TopologyManager;
 import io.zeebe.broker.clustering.base.topology.TopologyPartitionListener;
-import io.zeebe.broker.system.workflow.repository.api.management.FetchWorkflowRequest;
-import io.zeebe.broker.system.workflow.repository.api.management.FetchWorkflowResponse;
+import io.zeebe.broker.workflow.deployment.data.DeploymentRecord;
+import io.zeebe.broker.workflow.deployment.data.DeploymentResource;
+import io.zeebe.broker.workflow.deployment.data.Workflow;
 import io.zeebe.broker.workflow.model.ExecutableWorkflow;
 import io.zeebe.broker.workflow.model.transformation.BpmnTransformer;
-import io.zeebe.clustering.management.FetchWorkflowResponseDecoder;
 import io.zeebe.model.bpmn.Bpmn;
 import io.zeebe.model.bpmn.BpmnModelInstance;
-import io.zeebe.transport.ClientResponse;
 import io.zeebe.transport.ClientTransport;
 import io.zeebe.transport.RemoteAddress;
 import io.zeebe.transport.SocketAddress;
 import io.zeebe.util.buffer.BufferUtil;
-import io.zeebe.util.sched.clock.ActorClock;
-import io.zeebe.util.sched.future.ActorFuture;
-import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -48,12 +44,6 @@ import org.agrona.collections.Long2ObjectHashMap;
 import org.agrona.io.DirectBufferInputStream;
 
 public class WorkflowCache implements TopologyPartitionListener {
-  public static final long LATEST_VERSION_REFRESH_INTERVAL = Duration.ofSeconds(10).toMillis();
-
-  private static final Duration FETCH_WORKFLOW_TIMEOUT = Duration.ofSeconds(30);
-
-  private final FetchWorkflowRequest fetchRequest = new FetchWorkflowRequest();
-  private final FetchWorkflowResponse fetchRespose = new FetchWorkflowResponse();
 
   private final Long2ObjectHashMap<DeployedWorkflow> workflowsByKey = new Long2ObjectHashMap<>();
   private final Map<DirectBuffer, Int2ObjectHashMap<DeployedWorkflow>>
@@ -77,97 +67,65 @@ public class WorkflowCache implements TopologyPartitionListener {
     topologyManager.removeTopologyPartitionListener(this);
   }
 
-  public ActorFuture<ClientResponse> fetchWorkflowByKey(long key) {
-    fetchRequest.reset().workflowKey(key);
+  public void addWorkflow(DeploymentRecord deploymentRecord) {
+    for (Workflow workflow : deploymentRecord.workflows()) {
+      final long key = workflow.getKey();
 
-    return clientTransport
-        .getOutput()
-        .sendRequestWithRetry(
-            this::systemTopicLeader, this::checkResponse, fetchRequest, FETCH_WORKFLOW_TIMEOUT);
-  }
-
-  public ActorFuture<ClientResponse> fetchLatestWorkflowByBpmnProcessId(
-      DirectBuffer bpmnProcessId) {
-    fetchRequest.reset().latestVersion().bpmnProcessId(bpmnProcessId);
-
-    return clientTransport
-        .getOutput()
-        .sendRequestWithRetry(
-            this::systemTopicLeader, this::checkResponse, fetchRequest, FETCH_WORKFLOW_TIMEOUT);
-  }
-
-  public ActorFuture<ClientResponse> fetchWorkflowByBpmnProcessIdAndVersion(
-      DirectBuffer bpmnProcessId, int version) {
-    fetchRequest.reset().version(version).bpmnProcessId(bpmnProcessId);
-
-    return clientTransport
-        .getOutput()
-        .sendRequestWithRetry(
-            this::systemTopicLeader, this::checkResponse, fetchRequest, FETCH_WORKFLOW_TIMEOUT);
-  }
-
-  private boolean checkResponse(DirectBuffer responseBuffer) {
-    return !fetchRespose.tryWrap(responseBuffer, 0, responseBuffer.capacity());
-  }
-
-  public DeployedWorkflow addWorkflow(DirectBuffer response) {
-    final long now = ActorClock.currentTimeMillis();
-
-    fetchRespose.wrap(response, 0, response.capacity());
-
-    final long key = fetchRespose.getWorkflowKey();
-
-    final DeployedWorkflow existing = workflowsByKey.get(key);
-    DeployedWorkflow deployedWorkflow = null;
-
-    if (existing != null) {
-      existing.setFetched(now);
-      deployedWorkflow = existing;
-    } else {
-      if (key != FetchWorkflowResponseDecoder.workflowKeyNullValue()) {
-        final DirectBuffer bpmnProcessId = fetchRespose.bpmnProcessId();
-        final DirectBuffer bpmnXml = fetchRespose.getBpmnXml();
-        final int version = fetchRespose.getVersion();
-
-        // TODO: pull these things apart
-        // TODO: may wanna catch exceptions
-        final BpmnModelInstance modelInstance =
-            Bpmn.readModelFromStream(new DirectBufferInputStream(bpmnXml));
-
-        // TODO: do design time and runtime validation
-
-        final List<ExecutableWorkflow> definitions =
-            transformer.transformDefinitions(modelInstance);
-
-        final ExecutableWorkflow workflow =
-            definitions
-                .stream()
-                .filter((w) -> BufferUtil.equals(bpmnProcessId, w.getId()))
-                .findFirst()
-                .get();
-
-        deployedWorkflow = new DeployedWorkflow(workflow, key, version, now);
-
-        workflowsByKey.put(key, deployedWorkflow);
-
-        Int2ObjectHashMap<DeployedWorkflow> versionMap =
-            workflowsByProcessIdAndVersion.get(bpmnProcessId);
-
-        if (versionMap == null) {
-          versionMap = new Int2ObjectHashMap<>();
-          workflowsByProcessIdAndVersion.put(bpmnProcessId, versionMap);
-        }
-
-        versionMap.put(version, deployedWorkflow);
-
-        final DeployedWorkflow latestVersion = latestWorkflowsByProcessId.get(bpmnProcessId);
-        if (latestVersion == null || latestVersion.getVersion() < version) {
-          latestWorkflowsByProcessId.put(bpmnProcessId, deployedWorkflow);
+      final DirectBuffer resourceName = workflow.getResourceName();
+      for (DeploymentResource resource : deploymentRecord.resources()) {
+        if (resource.getResourceName().equals(resourceName)) {
+          addWorkflowToCache(workflow, key, resource);
         }
       }
     }
+  }
 
-    return deployedWorkflow;
+  private void addWorkflowToCache(Workflow workflow, long key, DeploymentResource resource) {
+    final int version = workflow.getVersion();
+    final DirectBuffer bpmnProcessId = workflow.getBpmnProcessId();
+    final DirectBuffer bpmnXml = resource.getResource();
+    Loggers.WORKFLOW_REPOSITORY_LOGGER.trace(
+        "Workflow {} with version {} added", bpmnProcessId, version);
+    // TODO: pull these things apart
+    // TODO: may wanna catch exceptions
+    final BpmnModelInstance modelInstance =
+        Bpmn.readModelFromStream(new DirectBufferInputStream(bpmnXml));
+
+    // TODO: do design time and runtime validation
+
+    final List<ExecutableWorkflow> definitions = transformer.transformDefinitions(modelInstance);
+
+    final ExecutableWorkflow executableWorkflow =
+        definitions
+            .stream()
+            .filter((w) -> BufferUtil.equals(bpmnProcessId, w.getId()))
+            .findFirst()
+            .get();
+
+    final DeployedWorkflow deployedWorkflow =
+        new DeployedWorkflow(executableWorkflow, key, version);
+
+    addDeployedWorkflowToState(key, deployedWorkflow, version, bpmnProcessId);
+  }
+
+  private void addDeployedWorkflowToState(
+      long key, DeployedWorkflow deployedWorkflow, int version, DirectBuffer bpmnProcessId) {
+    workflowsByKey.put(key, deployedWorkflow);
+
+    Int2ObjectHashMap<DeployedWorkflow> versionMap =
+        workflowsByProcessIdAndVersion.get(bpmnProcessId);
+
+    if (versionMap == null) {
+      versionMap = new Int2ObjectHashMap<>();
+      workflowsByProcessIdAndVersion.put(bpmnProcessId, versionMap);
+    }
+
+    versionMap.put(version, deployedWorkflow);
+
+    final DeployedWorkflow latestVersion = latestWorkflowsByProcessId.get(bpmnProcessId);
+    if (latestVersion == null || latestVersion.getVersion() < version) {
+      latestWorkflowsByProcessId.put(bpmnProcessId, deployedWorkflow);
+    }
   }
 
   private RemoteAddress systemTopicLeader() {
@@ -175,19 +133,7 @@ public class WorkflowCache implements TopologyPartitionListener {
   }
 
   public DeployedWorkflow getLatestWorkflowVersionByProcessId(DirectBuffer processId) {
-    final DeployedWorkflow latest = latestWorkflowsByProcessId.get(processId);
-
-    if (latest != null) {
-      final long now = ActorClock.currentTimeMillis();
-
-      if (now - latest.getFetched() > LATEST_VERSION_REFRESH_INTERVAL) {
-        // refresh latest version
-        Loggers.WORKFLOW_REPOSITORY_LOGGER.debug("fetch latest version");
-        return null;
-      }
-    }
-
-    return latest;
+    return latestWorkflowsByProcessId.get(processId);
   }
 
   public DeployedWorkflow getWorkflowByProcessIdAndVersion(DirectBuffer processId, int version) {
